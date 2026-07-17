@@ -8,6 +8,8 @@ load_dotenv()
 
 stock_api_key = os.getenv("STOCK_API_KEY")
 news_api_key = os.getenv("NEWS_API_KEY")
+EMAIL = os.getenv("EMAIL")
+PASSWORD = os.getenv("PASSWORD")
 STOCK = "TSLA"
 COMPANY_NAME = "Tesla Inc"
 
@@ -31,40 +33,25 @@ day_before_yesterday = str(previous_business_day(previous_business_day(today)))
 r = requests.get(STOCK_ENDPOINT, params=stock_parameters)
 data = r.json()
 
-## STEP 1: Use https://newsapi.org/docs/endpoints/everything
-# When STOCK price increase/decreases by 5% between yesterday and the day before yesterday then print("Get News").
-#HINT 1: Get the closing price for yesterday and the day before yesterday. Find the positive difference between the two prices. e.g. 40 - 20 = -20, but the positive difference is 20.
-#HINT 2: Work out the value of 5% of yerstday's closing stock price.
 yesterday_close = float(data["Time Series (Daily)"][yesterday]["4. close"])
 day_before_yesterday_close = float(data["Time Series (Daily)"][day_before_yesterday]["4. close"])
 
 alert_threshold = .05 * yesterday_close
 difference = abs(day_before_yesterday_close - yesterday_close)
-print(difference)
 
-
-
-
-## STEP 2: Use https://newsapi.org/docs/endpoints/everything
-# Instead of printing ("Get News"), actually fetch the first 3 articles for the COMPANY_NAME. 
-#HINT 1: Think about using the Python Slice Operator
 news_parameters = {
     "apiKey": news_api_key,
     "q": COMPANY_NAME,
 
 }
 
-if difference > alert_threshold:
+if difference >= alert_threshold:
     news = requests.get(NEWS_ENDPOINT, params=news_parameters)
     news_data = news.json()
     articles = news_data["articles"][:3]
-    for a in articles:
-        print(a["title"])
-        print(a["description"])
-        print()
+    email_body = "\n\n".join(f"{a["title"]}\n{a["description"]}" for a in articles)
 
-
-
-## STEP 3: Use twilio.com/docs/sms/quickstart/python
-# Send a separate message with each article's title and description to your phone number. 
-#HINT 1: Consider using a List Comprehension.
+    with SMTP("smtp.gmail.com", 587) as connection:
+        connection.starttls()
+        connection.login(EMAIL,PASSWORD)
+        connection.sendmail(from_addr=EMAIL, to_addrs=EMAIL, msg=f"Subject:TSLA 5% swing\n\n{email_body}".encode("utf-8"))
